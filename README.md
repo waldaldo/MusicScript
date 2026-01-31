@@ -1,42 +1,47 @@
-YouTube Music Radio for Hyprland (Wrapper)
+YouTube Music Radio for Hyprland - Quick Guide
 
-Resumen
-- Conjunto de scripts que permiten buscar y reproducir música de YouTube Music mediante MPV, usando la API de YouTube Music (ytmusicapi) y una interfaz de usuario simple basada en Wofi (Wayland).
-- El flujo principal es: el script de fondo (radio.py) maneja la obtención de pistas y la reproducción; un launcher (wofi_launcher.sh) orquesta la interacción de usuario y lanza radio.py con los parámetros adecuados.
+Overview
+- A small collection of scripts that orchestrate YouTube Music playback via MPV using the ytmusicapi. The core radio.py handles search by artist/song, mood/genre, and playlists. A launcher (wofi_launcher.sh) provides a lightweight UI to drive the radio.py flow. The setup is aimed to be simple and easily integrate with Hyprland.
 
-Estructura del repositorio (en la carpeta Musica)
-- radio.py: núcleo de la funcionalidad. Implementa la lógica de búsqueda, mood/genre, playlist, notificaciones y control de MPV a través de IPC.
-- wofi_launcher.sh: launcher que presenta un menú con las opciones disponibles y llama a radio.py con el modo correspondiente.
-- requirements.txt: dependencias de Python necesarias (ytmusicapi, requests, etc.).
-- README.md: presente para documentación y guía de uso.
+Project layout (in Musica directory)
+- radio.py: Core radio logic (search, mood/genre, playlist, notifications, MPV IPC).
+- wofi_launcher.sh: Launcher wrapper that drives radio.py via wofi (Wayland).
+- requirements.txt: Python dependencies.
+- README.md: This file.
 
-Requisitos previos
-- MPV instalado (para reproducción de audio).
-- Python 3.x y pip disponible.
-- Dependencias instaladas: ejecutar en el directorio del proyecto:
-  - python3 -m venv venv
-  - source venv/bin/activate
-  - pip install -r requirements.txt
-- Si utilizas Wayland, disponer de Wofi para el launcher; el script actual usa wofi. Si prefieres rofi, puedo adaptar el launcher, pero actualmente está enfocado en wofi.
+Prerequisites
+- MPV is installed for audio playback.
+- Python 3.x and pip are available; a virtual environment is recommended.
+- On Wayland: wofi is recommended for the launcher; rofi can be used with minor adaptations.
+- Network access for YouTube data is required.
 
-Uso básico
-  - /home/walo/.config/hypr/scripts/Musica/wofi_launcher.sh
-  - Aparecerá un menú con tres opciones: buscar por artista/canción, describir con palabras el tipo de música, explorar categorías de mood/género.
-  - Cada opción se conecta con radio.py para obtener resultados y reproducirlos mediante MPV.
+Setup
+- Create a Python virtual environment and install dependencies:
+  python3 -m venv venv
+  source venv/bin/activate
+  pip install -r requirements.txt
+- Ensure launcher is executable:
+  chmod +x /path/to/wofi_launcher.sh
 
-Integración con Hyprland (atajos de teclado)
-- Ejemplo mínimo para lanzar el launcher desde Hyprland con Mod+R (sin depender de UserPrefs):
-  bindd = $mainMod, R, YouTube Music launcher, exec, /home/walo/.config/hypr/scripts/Musica/wofi_launcher.sh
-- Asegúrate de recargar Hyprland tras añadir el binding: hyprctl reload
+Usage
+- Run the launcher from terminal:
+  /path/to/wofi_launcher.sh
+- The launcher presents three options:
+  1) Buscar por artista/canción
+  2) Describir con palabras el tipo de música
+  3) Explorar categorías de mood/género
+- For mood categories, the launcher fetches the available mood/genre categories from radio.py and shows them for selection. The final invocation uses:
+  radio.py --mode category --params "<JSON>"
+- All paths refer to the actual installed locations (adjust as needed).
 
-Notas técnicas
-- radio.py administra la reproducción, notificaciones y la creación de la cola de MPV.
-- El launcher solo orquesta la interacción del usuario y la invocación de radio.py con la opción adecuada.
-- Los archivos y rutas son absolutas para evitar dependencias de entorno al ejecutarse desde Hyprland.
-- Si necesitas cambiar la ruta de los scripts, actualiza las rutas en el launcher o en el binding de Hyprland.
+Hyprland integration (hotkey)
+- You can bind a hotkey (e.g., Mod+R) to launch the launcher script.
+- Example (paths are illustrative):
+  bindd = $mainMod, R, YouTube Music launcher, exec, /path/to/wofi_launcher.sh
+- After editing the Hyprland config, reload hyprland: hyprctl reload
 
-Contribución y mantenimiento
-- Este README describe el flujo actual y la estructura de archivos. Si necesitas añadir más modos o ampliar el soporte de entrada (p. ej., rofi), puedo adaptar el launcher o crear un segundo launcher.
+Extensibility
+- The launcher is intentionally minimal to simplify maintenance. It can be adapted to rofi as well by replacing the launcher with a rofi-based variant.
 
-Licencia
-- No se especifica una licencia en este repositorio local. Si vas a publicarlo, te sugiero añadir una licencia (MIT, Apache, etc.).
+License
+- No license specified in this local repository. If you publish, consider adding a license (MIT, Apache-2.0, etc.).
