@@ -1,4 +1,4 @@
-- YouTube Music Radio para Hyprland - Guía rápida y estética
+- YouTube Music Radio para Hyprland 
 
 Resumen
 - Un conjunto de scripts que permiten reproducir música de YouTube Music mediante MPV, utilizando la API de YouTube Music (ytmusicapi). El núcleo es radio.py, que gestiona búsquedas, moods/géneros y listas de reproducción. Un launcher (wofi_launcher.sh) orquesta la interacción del usuario y llama a radio.py con los parámetros adecuados. Todo pensado para una integración simple con Hyprland.
