@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Wofi launcher for YouTube Music Radio integrated with Hyprland hotkey
-# Flow: Present the same top-level options as radio.py and dispatch to it.
+# Lanzador wofi para radio.py
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RADIO="${SCRIPT_DIR}/radio.py"

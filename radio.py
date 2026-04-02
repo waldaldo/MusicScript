@@ -145,10 +145,7 @@ class MediaKeysController:
             except Exception as e:
                 pass
                 
-        def on_release(key):
-            pass
-            
-        with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+        with keyboard.Listener(on_press=on_press) as listener:
             while self.running:
                 time.sleep(0.1)
             listener.stop()
@@ -184,15 +181,9 @@ class MediaKeysController:
 
 class MpvPlayer:
     def __init__(self):
-        # Limpiar socket anterior si existe
         if os.path.exists(SOCKET_PATH):
             os.remove(SOCKET_PATH)
-            
-        # Iniciar MPV como proceso independiente
-        # --idle: no cerrar cuando acabe la playlist
-        # --no-video: solo audio (ahorra recursos)
-        # --input-ipc-server: para controlarlo
-        # --ytdl-format: asegurar audio
+
         self.process = subprocess.Popen([
             "mpv",
             "--idle",
@@ -200,13 +191,12 @@ class MpvPlayer:
             f"--input-ipc-server={SOCKET_PATH}",
             "--ytdl-format=bestaudio/best"
         ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        # Esperar a que el socket esté listo
+
         retries = 20
         while not os.path.exists(SOCKET_PATH) and retries > 0:
             time.sleep(0.1)
             retries -= 1
-            
+
         if not os.path.exists(SOCKET_PATH):
             raise Exception("No se pudo iniciar MPV IPC socket")
             
@@ -215,11 +205,9 @@ class MpvPlayer:
         self.current_video_id = None
         
     def send_command(self, command):
-        """Envía un comando JSON a MPV."""
         try:
             data = json.dumps(command) + "\n"
             self.sock.sendall(data.encode('utf-8'))
-            # Leer respuesta (básico, para vaciar buffer)
             self.sock.setblocking(False)
             try:
                 self.sock.recv(4096)
@@ -229,18 +217,16 @@ class MpvPlayer:
         except Exception as e:
             print(f"Error enviando comando MPV: {e}")
 
-    def add_to_playlist(self, url, title=None):
-        cmd = {"command": ["loadfile", url, "append"]}
-        self.send_command(cmd)
+    def add_to_playlist(self, url):
+        self.send_command({"command": ["loadfile", url, "append"]})
 
     def get_property(self, prop):
-        cmd = {"command": ["get_property", prop]}
         try:
-            self.sock.sendall((json.dumps(cmd) + "\n").encode())
+            self.sock.sendall((json.dumps({"command": ["get_property", prop]}) + "\n").encode())
             data = self.sock.recv(4096).decode()
-            # La respuesta puede ser múltiples líneas JSON
             for line in data.split('\n'):
-                if not line: continue
+                if not line:
+                    continue
                 try:
                     resp = json.loads(line)
                     if resp.get('error') == 'success':
@@ -434,18 +420,9 @@ def get_youtube_thumbnail(video_id):
     return None
 
 def send_notification(title, artist, video_id, thumb_url=None):
-    
-    """Descarga thumb y notifica."""
     try:
-        # Prioridad: URL del thumbnail de YTMusic > Thumbnail directo de YouTube > Fallback
-        final_thumb_url = None
+        final_thumb_url = thumb_url or (get_youtube_thumbnail(video_id) if video_id else None)
         
-        if thumb_url:
-            final_thumb_url = thumb_url
-        elif video_id:
-            final_thumb_url = get_youtube_thumbnail(video_id)
-        
-        # Descargar imagen
         if final_thumb_url:
             try:
                 headers = {
@@ -475,12 +452,10 @@ def send_notification(title, artist, video_id, thumb_url=None):
         print(f"Error notificación: {e}")
 
 def list_categories_for_rofi(yt):
-    """Imprime categorías en formato simple para scripts externos."""
     try:
         categories = yt.get_mood_categories()
         for section, items in categories.items():
             for item in items:
-                # Usamos un separador poco común para parsear luego
                 print(f"{item['title']} ;; {section} ;; {json.dumps(item['params'])}")
     except Exception as e:
         print(f"Error: {e}")
@@ -488,7 +463,6 @@ def list_categories_for_rofi(yt):
 def main():
     check_dependencies()
     
-    # Configurar argumentos
     parser = argparse.ArgumentParser(description="YouTube Music Radio Player")
     parser.add_argument("--mode", choices=['search', 'prompt', 'category', 'list-categories'], help="Modo de operación")
     parser.add_argument("--query", help="Texto de búsqueda o prompt")
@@ -496,19 +470,16 @@ def main():
     args = parser.parse_args()
 
     yt = YTMusic()
-    
-    # Modo listado para Rofi (solo imprime y sale)
+
     if args.mode == 'list-categories':
         list_categories_for_rofi(yt)
         return
 
     tracks = []
     video_id = None
-    
-    # Lógica de selección (Interactiva vs Argumentos)
+
     if args.mode:
-        # --- MODO NO INTERACTIVO (ARGS) ---
-        print(f"=== Radio YouTube Music (Background: {args.mode}) ===")
+        print(f"=== Radio YouTube Music ({args.mode}) ===")
         
         if args.mode == 'search':
             if not args.query:
@@ -547,8 +518,7 @@ def main():
                 tracks = mood_tracks
             
     else:
-        # --- MODO INTERACTIVO (CLI ORIGINAL) ---
-        print("=== Radio YouTube Music (MPV IPC) ===")
+        print("=== Radio YouTube Music ===")
         print("\n¿Cómo quieres buscar música?")
         print("1. Búsqueda por artista/canción (tradicional)")
         print("2. Describir con palabras el tipo de música (ej: 'música relajante para estudiar')")
@@ -630,69 +600,45 @@ def main():
         print(f"Cargando {len(tracks)} canciones a la cola...")
 
         for track in tracks:
-            if not isinstance(track, dict): continue
-            
+            if not isinstance(track, dict):
+                continue
+
             vid = track.get('videoId')
             title = track.get('title')
-            
-            # Manejar None values
+
             if not vid:
                 continue
-                
-            # Asegurar que vid y title sean usables como claves (strings)
+
             if not isinstance(vid, str):
                 vid = str(vid)
-            
             if title is None:
                 title = "Unknown"
             elif not isinstance(title, str):
-                # A veces puede venir como objeto complejo o lista, aunque es raro en esta llamada
                 title = str(title)
-            
-            # Construir URL completa
-            url = f"https://www.youtube.com/watch?v={vid}"
-            
-            # Guardar metadatos para uso posterior
+
             track_map[vid] = track
-            track_map[title] = track # Por si acaso MPV devuelve título
+            track_map[title] = track
+            player.add_to_playlist(f"https://www.youtube.com/watch?v={vid}")
             
-            # Añadir a MPV
-            player.add_to_playlist(url)
-            
-        # Comenzar reproducción (si estaba idle)
         player.send_command({"command": ["playlist-play-index", 0]})
-        
+
         print("Reproduciendo. Controla con teclas multimedia.")
         print("Presiona Ctrl+C para salir.")
-        
-        # Bucle de monitorización
+
         last_title = ""
         while True:
-            # Obtener título actual o media-title
             curr_title = player.get_property("media-title")
-            
-            # Si es un dict (metadatos internos de mpv/ytdl aún cargando), ignorar
+
             if not isinstance(curr_title, str):
                 time.sleep(0.5)
                 continue
-            
-            # A veces media-title es la URL si yt-dlp no ha cargado metadata aún
-            # O yt-dlp pone el título real del video.
-            
+
             if curr_title and curr_title != last_title:
                 # Ha cambiado la canción
                 last_title = curr_title
                 
-                # Intentar buscar metadatos enriquecidos en nuestro mapa
-                # El título de MPV puede diferir ligeramente del de YTMusic
-                # Buscamos coincidencia aproximada o directa
-                found_track = None
-                
-                # Intento 1: Coincidencia exacta de título
-                if curr_title in track_map:
-                    found_track = track_map[curr_title]
-                else:
-                    # Intento 2: Buscar por substring
+                found_track = track_map.get(curr_title)
+                if not found_track:
                     for k, v in track_map.items():
                         if k in curr_title or curr_title in k:
                             found_track = v
